@@ -93,7 +93,7 @@ class CrawlerWorker:
                 self.difficulty = data['currentData']['problem']['difficulty']
                 self.title = Utils.clean_folder_name(soup.article.h1.get_text())
             except KeyError:
-                self.progress_callback(-1, "异常, 你无权查看此题目")
+                self.switch_crawl_progress(-1, "异常, 你无权查看此题目")
                 # if callable(self.progress_callback):
                 #     self.progress_callback(self.id, -1, "异常! 你无权查看此题目!")
             html2text_converter = html2text.HTML2Text()
@@ -107,7 +107,7 @@ class CrawlerWorker:
         else:
             # if callable(self.progress_callback):
             #     print("Error! Status Code: " + str(page.status_code))
-            self.progress_callback(-1, f"访问题目页面出错, 代码: {page.status_code}")
+            self.switch_crawl_progress(-1, f"访问题目页面出错, 代码: {page.status_code}")
 
     def get_solution_website_link(self):
         return "https://www.luogu.com.cn/problem/solution/P" + str(self.id)
@@ -127,7 +127,7 @@ class CrawlerWorker:
             except IndexError:
                 # if callable(self.progress_callback):
                 #     self.progress_callback(self.id, -1, "异常! 题解不存在.")
-                self.progress_callback(-1, "异常, 题解不存在.")
+                self.switch_crawl_progress(-1, "异常, 题解不存在.")
             else:
                 with open(self.generate_solution_filename(), 'w', encoding='utf-8') as file:
                     file.write(first_result_content)
@@ -136,4 +136,4 @@ class CrawlerWorker:
         else:
             # if callable(self.progress_callback):
             #     print("Error! Status Code: " + str(page.status_code))
-            self.progress_callback(-1, f"访问题解页面出错, 代码: {page.status_code}")
+            self.switch_crawl_progress(-1, f"访问题解页面出错, 代码: {page.status_code}")
