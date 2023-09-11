@@ -1,10 +1,12 @@
-import functools
+import random
 import time
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import threading
 import queue
 from WebCrawlerWorker import WebCrawlerWorker
+
+complete_message_box_show = False
 
 
 def select_path():
@@ -22,24 +24,22 @@ def callback(exercise_id, status, status_text):
         tree.insert('', "end", exercise_id, values=(exercise_id, status_text))
         tree.yview_moveto(1.0)
 
+
 def start_crawling():
     # 给多线程工作的
-    def multithreaded(exercise_id, path):
-        # 回调函数以更新进程信息
-        worker = WebCrawlerWorker(exercise_id=exercise_id, path=path, progress_callback=callback)
-        worker.start_work()
-        work_queue.task_done()
-
-        # 防止密集请求
-        time.sleep(2)
-
+    def multithreaded():
         while not work_queue.empty():
-            worker = WebCrawlerWorker(exercise_id=work_queue.get(), path=path, progress_callback=callback)
+            worker = WebCrawlerWorker(exercise_id=work_queue.get(), path=save_path, progress_callback=callback)
             worker.start_work()
             work_queue.task_done()
-
             # 防止密集请求
-            time.sleep(2)
+            time.sleep(random.uniform(0, 6))
+
+    def check_task_complete():
+        while True:
+            if work_queue.empty():
+                messagebox.showinfo("任务完成", "任务完成!")
+                break
 
     # 初始化队列信息
     work_queue = queue.Queue()
@@ -53,14 +53,19 @@ def start_crawling():
     # start_ID - exercise_num 不能是负值
     if start_id - exercise_num < 1:
         raise ValueError("start_ID - exercise_num < 1 !")
-    for i in range(start_id - exercise_num+1, start_id+1):
+    for i in range(start_id - exercise_num + 1, start_id + 1):
         work_queue.put(i)
 
     # 从queue中拿取一个任务，分配给指定数量的线程
     for x in range(thread_num):
         if not work_queue.empty():
-            t = threading.Thread(target=multithreaded, args=(work_queue.get(), save_path))
+            # t = threading.Thread(target=multithreaded, args=(work_queue.get(), save_path))
+            t = threading.Thread(target=multithreaded)
             t.start()
+
+    # 检测任务是否完成线程
+    p = threading.Thread(target=check_task_complete)
+    p.start()
 
 
 # 创建主窗口
@@ -91,6 +96,18 @@ select_path_button.pack()
 path_entry = tk.Entry(root)
 path_entry.pack()
 
+# __client_id输入框
+session_id = tk.Label(root, text="__client_id: ")
+session_id.pack()
+session_id_entry = tk.Entry(root)
+session_id_entry.pack()
+
+# '_uid'输入框
+uid = tk.Label(root, text="_uid: ")
+uid.pack()
+uid_entry = tk.Entry(root)
+uid_entry.pack()
+
 # 创建开始按钮
 start_button = tk.Button(root, text="开始爬取", command=start_crawling)
 start_button.pack()
@@ -106,7 +123,5 @@ tree.pack()
 
 # 配置滚动条
 vsb.config(command=tree.yview)
-
-
 
 root.mainloop()

@@ -3,8 +3,8 @@ import os
 import re
 from urllib.parse import unquote
 
-diff_mapper = "./difficulty.json"
-tag_mapper = "./mapper.json"
+diff_mapper = r"mappers\difficulty.json"
+tag_mapper = r"mappers\mapper.json"
 
 
 def json_parser(decode_result):
@@ -17,7 +17,7 @@ def difficulty_parser(tag_id):
     try:
         # 打开 JSON 文件并读取内容
         print(os.getcwd())
-        with open("./difficulty.json", 'r') as file:
+        with open(diff_mapper, 'r') as file:
             data = json.load(file)
 
         # 检查指定的 tag_id 是否存在于 JSON 数据中的 'tags' 键中

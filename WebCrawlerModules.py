@@ -26,7 +26,7 @@ class CrawlerWorker:
 
         self.progress_callback = progress_callback
 
-    def switch_crawl_progress(self, status):
+    def switch_crawl_progress(self, status, status_text=None):
         if status == 1:
             self.status = 1
             self.status_text = "正在爬取题目!"
@@ -39,7 +39,9 @@ class CrawlerWorker:
         elif status == 4:
             self.status = 4
             self.status_text = "题解与题目爬取完毕!"
-
+        elif status is not None and status_text is not None:
+            self.status = status
+            self.status_text = status_text
         # 调用回调函数，传递status和status_text
         if callable(self.progress_callback):
             self.progress_callback(self.id, self.status, self.status_text)
@@ -49,21 +51,19 @@ class CrawlerWorker:
         return "https://www.luogu.com.cn/problem/P" + str(self.id)
 
     def generate_file_path(self):
-        if self.exercise_path is None:
-            taglist = ""
-
+        taglist = ""
+        if self.tags is not None:
             for p in self.tags:
                 taglist += "-" + Utils.tag_parser(str(p))
-            file_path = (self.path + "/" +
-                         Utils.difficulty_parser(str(self.difficulty)) + taglist + "/P" + str(self.id) + "-" + str(
-                self.title) + "/")
-            if not os.path.exists(file_path):
-                os.makedirs(file_path)
-            else:
-                print("文件夹已存在!")
-            self.exercise_path = file_path
+        file_path = (self.path + "/" +
+                     Utils.difficulty_parser(str(self.difficulty)) + taglist + "/P" + str(self.id) + "-" + str(
+            self.title) + "/")
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        else:
+            print("文件夹已存在!")
 
-        return self.exercise_path
+        return file_path
 
     def generate_exercise_filename(self):
         return self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
@@ -87,11 +87,15 @@ class CrawlerWorker:
 
             try:
                 self.tags = data['currentData']['problem']['tags']
+                # 如果没有标签，则用-1代表该题没有标签
+                if not self.tags:
+                    self.tags.append(-1)
                 self.difficulty = data['currentData']['problem']['difficulty']
                 self.title = Utils.clean_folder_name(soup.article.h1.get_text())
             except KeyError:
-                if callable(self.progress_callback):
-                    self.progress_callback(self.id, -1, "异常! 你无权查看此题目!")
+                self.progress_callback(-1, "异常, 你无权查看此题目")
+                # if callable(self.progress_callback):
+                #     self.progress_callback(self.id, -1, "异常! 你无权查看此题目!")
             html2text_converter = html2text.HTML2Text()
             # 将HTML转换为Markdown
             markdown_content = html2text_converter.handle(str(soup.article))
@@ -101,7 +105,9 @@ class CrawlerWorker:
                 self.switch_crawl_progress(2)
 
         else:
-            print("Error! Status Code: " + str(page.status_code))
+            # if callable(self.progress_callback):
+            #     print("Error! Status Code: " + str(page.status_code))
+            self.progress_callback(-1, f"访问题目页面出错, 代码: {page.status_code}")
 
     def get_solution_website_link(self):
         return "https://www.luogu.com.cn/problem/solution/P" + str(self.id)
@@ -119,12 +125,15 @@ class CrawlerWorker:
             try:
                 first_result_content = data['currentData']['solutions']['result'][0]['content']
             except IndexError:
-                if callable(self.progress_callback):
-                    self.progress_callback(self.id, -1, "异常! 题解不存在.")
+                # if callable(self.progress_callback):
+                #     self.progress_callback(self.id, -1, "异常! 题解不存在.")
+                self.progress_callback(-1, "异常, 题解不存在.")
             else:
                 with open(self.generate_solution_filename(), 'w', encoding='utf-8') as file:
                     file.write(first_result_content)
                     self.switch_crawl_progress(4)
 
         else:
-            print("Error! Status Code: " + str(page.status_code))
+            # if callable(self.progress_callback):
+            #     print("Error! Status Code: " + str(page.status_code))
+            self.progress_callback(-1, f"访问题解页面出错, 代码: {page.status_code}")
