@@ -1,21 +1,21 @@
 import os
 import WebCrawlerModules
 
+
 class WebCrawlerWorker:
-    def __init__(self, exercise_id, path, progress_callback=None):
+    def __init__(self, exercise_id, path, cookie, progress_callback=None):
         self.id = exercise_id
         self.header = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36'}
-        self.cookie = {
-            '__client_id': '1d9dc4c15ef13440c22d357bcde61b47ce930088',
-            '_uid': '87731'
-        }
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/70.0.3538.102 Safari/537.36'}
+        self.cookie = cookie
 
         self.path = path
         self.init_folder_configure()
 
         # 题解与练习的爬虫
-        self.crawler_worker = WebCrawlerModules.CrawlerWorker(self.path, self.id, self.header, self.cookie, progress_callback)
+        self.crawler_worker = WebCrawlerModules.CrawlerWorker(self.path, self.id, self.header, self.cookie,
+                                                              progress_callback)
 
     def init_folder_configure(self):
         if not os.path.exists(self.path):

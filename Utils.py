@@ -1,22 +1,33 @@
 import json
 import os
-import re
+import pickle
 from urllib.parse import unquote
+import re
+
 
 diff_mapper = r"mappers\difficulty.json"
 tag_mapper = r"mappers\mapper.json"
 
 
+def read_pickle_info():
+    if os.path.exists('luogucookie.pickle'):
+        f_stream = open('luogucookie.pickle', 'rb+')
+        data = pickle.load(file=f_stream)
+        f_stream.close()
+
+        return data
+    return None
+
+
 def json_parser(decode_result):
     data = json.loads(decode_result)
-
     return data
 
 
 def difficulty_parser(tag_id):
     try:
         # 打开 JSON 文件并读取内容
-        print(os.getcwd())
+        # print(os.getcwd())
         with open(diff_mapper, 'r') as file:
             data = json.load(file)
 
@@ -45,14 +56,13 @@ def tag_parser(tag_id):
 
 
 def uri_component_decoder(soup):
-    print(soup.script)
+    # print(soup.script)
 
     # 使用正则表达式匹配 decodeURIComponent() 函数中的参数值
     match = re.search(r'decodeURIComponent\("([^"]+)"\)', str(soup.script))
 
     if match:
         parameter_value = match.group(1)
-        print(parameter_value)
         # 解码URL编码字符串
         decoded_string = unquote(parameter_value)
         return decoded_string
@@ -62,10 +72,10 @@ def uri_component_decoder(soup):
 
 
 def clean_folder_name(folder_name):
-    # 使用正则表达式删除不符合命名规范的字符
-    clean_name = re.sub(r'[^\w\-]', '', folder_name)
+    # 匹配Windows不允许的字符
+    disallowed_chars = r'[<>:"/\\|?*]'
 
-    # 如果名称以连字符开头或结尾，也删除它们
-    clean_name = clean_name.strip('-')
+    # 使用re.sub()函数将不允许的字符替换为空字符串
+    clean_string = re.sub(disallowed_chars, '', folder_name)
 
-    return clean_name
+    return clean_string

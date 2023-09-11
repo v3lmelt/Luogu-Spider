@@ -8,6 +8,7 @@ import Utils
 import os
 
 
+
 class CrawlerWorker:
     def __init__(self, path, id, header, cookie, progress_callback=None):
         self.path = path
@@ -20,11 +21,13 @@ class CrawlerWorker:
         self.title = None
 
         self.exercise_path = None
+        self.solution_path = None
 
         self.status = 0
         self.status_text = "等待中..."
 
         self.progress_callback = progress_callback
+
 
     def switch_crawl_progress(self, status, status_text=None):
         if status == 1:
@@ -60,80 +63,84 @@ class CrawlerWorker:
             self.title) + "/")
         if not os.path.exists(file_path):
             os.makedirs(file_path)
-        else:
-            print("文件夹已存在!")
-
         return file_path
 
     def generate_exercise_filename(self):
-        return self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
+        exercise_path = self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
+        self.exercise_path = exercise_path
+        return exercise_path
 
     def generate_solution_filename(self):
-        return self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
+        solution_path = self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
+        self.solution_path = solution_path
+        return solution_path
 
     def get_exercise(self):
-        page = requests.get(self.get_full_website_link(), headers=self.header, cookies=self.cookie)
-        print(page)
-
-        #   判断网页是否成功获取
-        if page.status_code == 200:
-            soup = BeautifulSoup(page.content, 'lxml')
-            self.switch_crawl_progress(1)
-            # 获取题目的分类信息
-            decoded_json = Utils.uri_component_decoder(soup)
-            data = Utils.json_parser(decoded_json)
-
-            print(data)
-
-            try:
-                self.tags = data['currentData']['problem']['tags']
-                # 如果没有标签，则用-1代表该题没有标签
-                if not self.tags:
-                    self.tags.append(-1)
-                self.difficulty = data['currentData']['problem']['difficulty']
-                self.title = Utils.clean_folder_name(soup.article.h1.get_text())
-            except KeyError:
-                self.switch_crawl_progress(-1, "异常, 你无权查看此题目")
-                # if callable(self.progress_callback):
-                #     self.progress_callback(self.id, -1, "异常! 你无权查看此题目!")
-            html2text_converter = html2text.HTML2Text()
-            # 将HTML转换为Markdown
-            markdown_content = html2text_converter.handle(str(soup.article))
-            # 将Markdown文件保存至文件夹中
-            with open(self.generate_exercise_filename(), 'w', encoding='utf-8') as file:
-                file.write(markdown_content)
-                self.switch_crawl_progress(2)
-
+        try:
+            page = requests.get(self.get_full_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
+        except requests.exceptions.RequestException:
+            self.switch_crawl_progress(-1, "获取练习页面信息异常! 可能超时.")
         else:
-            # if callable(self.progress_callback):
-            #     print("Error! Status Code: " + str(page.status_code))
-            self.switch_crawl_progress(-1, f"访问题目页面出错, 代码: {page.status_code}")
+            #   判断网页是否成功获取
+            if page.status_code == 200:
+                # 煲汤喝一下
+                soup = BeautifulSoup(page.content, 'lxml')
+                self.switch_crawl_progress(1)
+                # 获取题目的分类信息
+                decoded_json = Utils.uri_component_decoder(soup)
+                data = Utils.json_parser(decoded_json)
+
+                # print(data)
+
+                try:
+                    self.tags = data['currentData']['problem']['tags']
+                    # 如果没有标签，则用-1代表该题没有标签
+                    if not self.tags:
+                        self.tags.append(-1)
+                    self.difficulty = data['currentData']['problem']['difficulty']
+                    self.title = Utils.clean_folder_name(soup.article.h1.get_text())
+                except KeyError:
+                    self.switch_crawl_progress(-1, "异常, 你无权查看此题目")
+                html2text_converter = html2text.HTML2Text()
+                # 将HTML转换为Markdown
+                markdown_content = html2text_converter.handle(str(soup.article))
+                # 将Markdown文件保存至文件夹中
+                with open(self.generate_exercise_filename(), 'w', encoding='utf-8') as file:
+                    file.write(markdown_content)
+                    self.switch_crawl_progress(2)
+
+            else:
+                self.switch_crawl_progress(-1, f"访问题目页面出错, 代码: {page.status_code}")
 
     def get_solution_website_link(self):
         return "https://www.luogu.com.cn/problem/solution/P" + str(self.id)
 
     def get_solution(self):
-        page = requests.get(self.get_solution_website_link(), headers=self.header, cookies=self.cookie)
-        #   判断网页是否成功获取
-        if page.status_code == 200:
-            self.switch_crawl_progress(3)
-            soup = BeautifulSoup(page.content, 'lxml')
-            decode_res = (Utils.uri_component_decoder(soup))
-            data = Utils.json_parser(decode_res)
-            # 提取 "result" 数组的第一个对象的 "content" 字段的值
-
-            try:
-                first_result_content = data['currentData']['solutions']['result'][0]['content']
-            except IndexError:
-                # if callable(self.progress_callback):
-                #     self.progress_callback(self.id, -1, "异常! 题解不存在.")
-                self.switch_crawl_progress(-1, "异常, 题解不存在.")
-            else:
-                with open(self.generate_solution_filename(), 'w', encoding='utf-8') as file:
-                    file.write(first_result_content)
-                    self.switch_crawl_progress(4)
-
+        try:
+            page = requests.get(self.get_solution_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
+        except requests.exceptions.RequestException:
+            self.switch_crawl_progress(-1, "获取练习页面信息异常! 可能超时.")
         else:
-            # if callable(self.progress_callback):
-            #     print("Error! Status Code: " + str(page.status_code))
-            self.switch_crawl_progress(-1, f"访问题解页面出错, 代码: {page.status_code}")
+            #   判断网页是否成功获取
+            if page.status_code == 200:
+                self.switch_crawl_progress(3)
+                soup = BeautifulSoup(page.content, 'lxml')
+                decode_res = (Utils.uri_component_decoder(soup))
+                data = Utils.json_parser(decode_res)
+                # 提取 "result" 数组的第一个对象的 "content" 字段的值
+
+                try:
+                    first_result_content = data['currentData']['solutions']['result'][0]['content']
+                except IndexError:
+                    # if callable(self.progress_callback):
+                    #     self.progress_callback(self.id, -1, "异常! 题解不存在.")
+                    self.switch_crawl_progress(-1, "异常, 题解不存在.")
+                except KeyError:
+                    self.switch_crawl_progress(-1, "异常, 题解不存在.")
+                else:
+                    with open(self.generate_solution_filename(), 'w', encoding='utf-8') as file:
+                        file.write(first_result_content)
+                        self.switch_crawl_progress(4)
+
+            else:
+                self.switch_crawl_progress(-1, f"访问题解页面出错, 代码: {page.status_code}")
