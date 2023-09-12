@@ -1,12 +1,17 @@
 import json
+import os
+import sqlite3
+import threading
 
 import html2text
 import requests
 from bs4 import BeautifulSoup
 
 import Utils
-import os
+from Log import LoggerHandler
 
+logger = LoggerHandler(name="CrawlerWorker")
+sync_lock = threading.Lock()
 
 
 class CrawlerWorker:
@@ -28,7 +33,6 @@ class CrawlerWorker:
 
         self.progress_callback = progress_callback
 
-
     def switch_crawl_progress(self, status, status_text=None):
         if status == 1:
             self.status = 1
@@ -49,7 +53,6 @@ class CrawlerWorker:
         if callable(self.progress_callback):
             self.progress_callback(self.id, self.status, self.status_text)
 
-
     def get_full_website_link(self):
         return "https://www.luogu.com.cn/problem/P" + str(self.id)
 
@@ -60,7 +63,7 @@ class CrawlerWorker:
                 taglist += "-" + Utils.tag_parser(str(p))
         file_path = (self.path + "/" +
                      Utils.difficulty_parser(str(self.difficulty)) + taglist + "/P" + str(self.id) + "-" + str(
-            self.title) + "/")
+                    self.title) + "/")
         if not os.path.exists(file_path):
             os.makedirs(file_path)
         return file_path
@@ -144,3 +147,68 @@ class CrawlerWorker:
 
             else:
                 self.switch_crawl_progress(-1, f"访问题解页面出错, 代码: {page.status_code}")
+        self.insert_obj_to_database()
+
+    def insert_obj_to_database(self):
+        # 翻译难度信息和tag信息
+
+        parsed_tags = []
+        if self.tags is not None:
+            for x in self.tags:
+                parsed_tags.insert(0, Utils.tag_parser(str(x)))
+
+        parsed_difficulty = ""
+        if self.difficulty is not None:
+            parsed_difficulty = Utils.difficulty_parser(str(self.difficulty))
+
+        exercise_data = {
+            'exercise_id': self.id,
+            'tags': ','.join(parsed_tags),
+            'difficulty': parsed_difficulty,
+            'title': self.title,
+            'exercise_path': self.exercise_path,
+            'solution_path': self.solution_path
+        }
+
+        sync_lock.acquire(True)
+        # 连接到SQLite数据库
+        conn = sqlite3.connect('storage_info.db')
+
+        # 创建一个游标对象，用于执行SQL语句
+        cursor = conn.cursor()
+
+        # 检查是否存在exercise表
+        cursor.execute('''SELECT name FROM sqlite_master WHERE type='table' AND name='exercise';''')
+        table_exists = cursor.fetchone()
+
+        if not table_exists:
+            # 如果表不存在，则创建exercise表
+            cursor.execute('''
+            CREATE TABLE exercise (
+                exercise_id INTEGER PRIMARY KEY,
+                tags TEXT,
+                difficulty TEXT,
+                title TEXT,
+                exercise_path TEXT,
+                solution_path TEXT
+            );
+            ''')
+            conn.commit()
+            print("exercise表已创建")
+        else:
+            # 查询数据库以检查是否存在具有相同 exercise_id 的记录
+            cursor.execute('SELECT exercise_id FROM exercise WHERE exercise_id = :exercise_id',
+                           {'exercise_id': self.id})
+            existing_id = cursor.fetchone()
+
+            if not existing_id:
+                # 如果不存在具有相同 exercise_id 的记录，才执行插入操作
+                cursor.execute('''
+                    INSERT INTO exercise (exercise_id, tags, difficulty, title, exercise_path, solution_path)
+                    VALUES (:exercise_id, :tags, :difficulty, :title, :exercise_path, :solution_path)
+                ''', exercise_data)
+                conn.commit()
+                logger.info(f"exercise_id {self.id} 已插入")
+            else:
+                logger.info(f"exercise_id {self.id} 已存在，无需插入")
+        sync_lock.release()

@@ -4,7 +4,6 @@ import pickle
 from urllib.parse import unquote
 import re
 
-
 diff_mapper = r"mappers\difficulty.json"
 tag_mapper = r"mappers\mapper.json"
 
@@ -79,3 +78,33 @@ def clean_folder_name(folder_name):
     clean_string = re.sub(disallowed_chars, '', folder_name)
 
     return clean_string
+
+
+def sort_json_data(path):
+    def load_json_file(file_path):
+        try:
+            with open(file_path, 'r') as file:
+                data = json.load(file)
+            return data
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def save_json_file(file_path, data):
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+
+    # 读取现有 JSON 数据
+    json_file_path = path
+    json_data = load_json_file(json_file_path)
+
+    # 检查是否成功加载 JSON 数据
+    if json_data:
+        # 按 exercise_id 大小排序 JSON 数据
+        sorted_json_data = sorted(json_data, key=lambda x: x['exercise_id'])
+
+        # 将排序后的数据重新写入 JSON 文件
+        save_json_file(json_file_path, sorted_json_data)
+
+        print("JSON 数据已按 exercise_id 大小排序并保存到文件。")
+    else:
+        print("无法加载 JSON 数据或文件为空。")
