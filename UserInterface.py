@@ -4,9 +4,11 @@ import queue
 import random
 import threading
 import time
-from tkinter import filedialog, messagebox
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
 
 import Utils
 from Log import LoggerHandler
@@ -15,6 +17,16 @@ from WebCrawlerWorker import WebCrawlerWorker
 complete_message_box_show = False
 
 logger = LoggerHandler(name="UserInterface")
+
+'''
+========
+UI部分
+def select_path():
+    该方法弹出一个对话框，让用户选择文件夹路径.
+def callback():
+    改方法负责更新TkInter Treeview中的爬虫线程信息.
+========
+'''
 
 
 def select_path():
@@ -32,9 +44,26 @@ def callback(exercise_id, status, status_text):
         tree.yview_moveto(1.0)
 
 
+'''
+登录界面
 def handle_login():
+    该方法是UI界面中点击"登录"按钮后触发的方法, Selenium会试图获取存放与当前文件夹下的chromedriver.exe,
+    并且在获取成功之后打开浏览器页面.
+    
+    这个方法还使用了pickle库保存用户登录之后的信息，方便之后随时读取.
+    为了不阻塞主线程，这个登录是跑在其他线程上的.
+'''
+
+
+def handle_login():
+    def get_driver():
+        service = ChromeService(executable_path=r"./chromedriver.exe")
+        driver = webdriver.Chrome(service=service)
+
+        return driver
+
     def get_cookie():
-        browser = webdriver.Chrome()
+        browser = get_driver()
         browser.get("https://www.luogu.com.cn/auth/login")
         while True:
             if browser.current_url == 'https://www.luogu.com.cn/':
@@ -56,11 +85,15 @@ def handle_login():
                 pickle.dump(cookies, output_path)
                 output_path.close()
 
-                uid_entry.insert(0, str(cookies['_uid']))
-                client_id_entry.insert(0, str(cookies['__client_id']))
+                uid_var.set(str(cookies['_uid']))
+                client_id_display_var.set(str(cookies['__client_id']))
+
+                uid_display.update()
+                client_id_display.update()
 
                 return cookies
 
+    # 注意! 这是跑在其他线程上的!
     p = threading.Thread(target=get_cookie)
     p.start()
 
@@ -72,6 +105,19 @@ def check_cookie_info_valid():
         if cookie_info['expiry'] > int(time.time()):
             return True
     return False
+
+
+'''
+========
+开始爬取
+    def start_crawling():
+        负责爬取工作的初始化工作, 并在之后开辟线程执行multithreaded()和check_task_complete()
+        def multithreaded():
+            该方法通过创建WebCrawlerWorker对象并从work_queue中取出一个待爬取的ID, 开始爬取工作.
+        def check_task_complete():
+            该方法运行在其他线程上, 通过死循环检测work_queue是否为空从而检测爬取工作是否成功完成.
+========
+'''
 
 
 def start_crawling():
@@ -87,7 +133,9 @@ def start_crawling():
     def check_task_complete():
         while True:
             if work_queue.empty():
+                time.sleep(0.1)
                 messagebox.showinfo("任务完成", "任务完成!")
+                Utils.run_jar()
                 break
 
     # 初始化登录信息
@@ -104,13 +152,11 @@ def start_crawling():
         # 从pickle文件中读取信息
         cookie_data = Utils.read_pickle_info()
 
-        # 清空uid_entry及client_id_entry
-        uid_entry.delete(0, 'end')
-        client_id_entry.delete(0, 'end')
+        uid_var.set(str(cookie_data['_uid']))
+        client_id_display_var.set(str(cookie_data['__client_id']))
 
-        uid_entry.insert(0, cookie_data['_uid'])
-        client_id_entry.insert(0, cookie_data['__client_id'])
-
+        uid_display.update()
+        client_id_display.update()
         # 生成传给Worker的参数
         actual_cookie = {'_uid': str(cookie_data['_uid']), '__client_id': str(cookie_data['__client_id'])}
 
@@ -135,55 +181,59 @@ def start_crawling():
         p.start()
 
 
-import tkinter as tk
-from tkinter import ttk
+'''
+========
+ UI部分
+========
+'''
 
 # 创建主窗口
 root = tk.Tk()
 root.title("Web爬虫GUI")
 
 # 创建起始题目ID标签和输入框
-exercise_id_label = tk.Label(root, text="起始题目ID:")
-exercise_id_label.grid(row=0, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+exercise_id_label = tk.Label(root, text="起始题目ID")
+exercise_id_label.grid(row=0, column=0, padx=(10, 5), pady=5)
 
 exercise_id_entry = tk.Entry(root)
-exercise_id_entry.grid(row=0, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
+exercise_id_entry.grid(row=0, column=1, padx=(5, 10), pady=5)
 
 # 创建要爬取的题目数量标签和输入框
-num_of_exercises_label = tk.Label(root, text="要爬取的题目数量:")
-num_of_exercises_label.grid(row=1, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+num_of_exercises_label = tk.Label(root, text="要爬取的题目数量")
+num_of_exercises_label.grid(row=1, column=0, padx=(10, 5), pady=5)
 
 num_of_exercises_entry = tk.Entry(root)
-num_of_exercises_entry.grid(row=1, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
+num_of_exercises_entry.grid(row=1, column=1, padx=(5, 10), pady=5)
 
 # 创建线程数标签和输入框
-thread_num_label = tk.Label(root, text="线程数:")
-thread_num_label.grid(row=2, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+thread_num_label = tk.Label(root, text="线程数")
+thread_num_label.grid(row=2, column=0, padx=(10, 5), pady=5)
 
 thread_num_entry = tk.Entry(root)
-thread_num_entry.grid(row=2, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
+thread_num_entry.grid(row=2, column=1, padx=(5, 10), pady=5)
 
 # 创建选择路径按钮和路径输入框
 select_path_button = tk.Button(root, text="选择路径", command=select_path)
-select_path_button.grid(row=3, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+select_path_button.grid(row=3, column=0, padx=(10, 5), pady=5)
 
 path_entry = tk.Entry(root)
-path_entry.grid(row=3, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
+path_entry.grid(row=3, column=1, padx=(5, 10), pady=5)
 
 # 创建__client_id标签和输入框
-client_id_label = tk.Label(root, text="__client_id:")
-client_id_label.grid(row=4, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+client_id_label = tk.Label(root, text="__client_id")
+client_id_label.grid(row=4, column=0, padx=(10, 5), pady=5)
 
-client_id_entry = tk.Entry(root)
-client_id_entry.grid(row=4, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
+client_id_display_var = tk.StringVar()
+client_id_display = tk.Label(root, textvariable=client_id_display_var)
+client_id_display.grid(row=4, column=1, padx=(5, 10), pady=5)
 
 # 创建_uid标签和输入框
-uid_label = tk.Label(root, text="_uid:")
-uid_label.grid(row=5, column=0, padx=(10, 5), pady=5)  # 将padx的值从10改为(10, 5)
+uid_label = tk.Label(root, text="_uid")
+uid_label.grid(row=5, column=0, padx=(10, 5), pady=5)
 
-uid_entry = tk.Entry(root)
-uid_entry.grid(row=5, column=1, padx=(5, 10), pady=5)  # 将padx的值从10改为(5, 10)
-
+uid_var = tk.StringVar()
+uid_display = tk.Label(root, textvariable=uid_var)
+uid_display.grid(row=5, column=1, padx=(5, 10), pady=5)
 # 创建开始按钮
 start_button = tk.Button(root, text="开始爬取", command=start_crawling)
 start_button.grid(row=6, column=0, columnspan=2, padx=10, pady=5)
@@ -204,4 +254,15 @@ tree.grid(row=8, column=0, columnspan=2, padx=10, pady=5)
 # 配置滚动条
 vsb.config(command=tree.yview)
 
-root.mainloop()
+if __name__ == '__main__':
+    if os.path.exists('luogucookie.pickle'):
+        # 从pickle文件中读取信息
+        cookie_data = Utils.read_pickle_info()
+
+        uid_var.set(str(cookie_data['_uid']))
+        client_id_display_var.set(str(cookie_data['__client_id']))
+
+        uid_display.update()
+        client_id_display.update()
+
+    root.mainloop()

@@ -4,6 +4,7 @@
 import logging
 import colorlog
 
+
 class LoggerHandler:
 
     def __init__(self,

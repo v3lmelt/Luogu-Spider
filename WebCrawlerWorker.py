@@ -1,10 +1,11 @@
-import logging
 import os
 
 import Log
 import WebCrawlerModules
 
 logger = Log.LoggerHandler(name="WebCrawlerWorker")
+
+
 class WebCrawlerWorker:
     def __init__(self, exercise_id, path, cookie, progress_callback=None):
         self.id = exercise_id
@@ -19,7 +20,6 @@ class WebCrawlerWorker:
         self.crawler_worker = WebCrawlerModules.CrawlerWorker(self.path, self.id, self.header, self.cookie,
                                                               progress_callback)
 
-
     def init_folder_configure(self):
         if not os.path.exists(self.path):
             # 如果文件夹不存在，使用os.mkdir创建它
@@ -27,5 +27,6 @@ class WebCrawlerWorker:
             # logger.info(f"文件夹 '{self.path}' 已创建")
 
     def start_work(self):
-        self.crawler_worker.get_exercise()
-        self.crawler_worker.get_solution()
+
+        if self.crawler_worker.get_exercise() != -1:
+            self.crawler_worker.get_solution()

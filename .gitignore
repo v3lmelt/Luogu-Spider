@@ -2,3 +2,10 @@
 __pycache__/
 luogucookie.pickle
 /storage_info.db
+chromedriver.exe
+LICENSE.chromedriver
+*.toc
+build/
+dist/
+*.spec
+frontend.jar
