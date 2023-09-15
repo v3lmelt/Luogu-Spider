@@ -137,7 +137,7 @@ def start_crawling():
             worker.start_work()
             work_queue.task_done()
             # 防止密集请求
-            time.sleep(random.uniform(0.3, 1))
+            time.sleep(random.uniform(0.5, 1))
 
     def check_task_complete():
         global is_server_run
@@ -195,6 +195,8 @@ def start_crawling():
                     if not work_queue.empty():
                         t = threading.Thread(target=multithreaded)
                         t.start()
+
+                        time.sleep(random.uniform(0.5, 1))
 
                 # 检测任务是否完成线程
                 p = threading.Thread(target=check_task_complete)
