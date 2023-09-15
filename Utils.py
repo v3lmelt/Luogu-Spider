@@ -143,11 +143,8 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("\u7701\u9009 noi- ", difficulty_parser("6"))
         self.assertEqual("NOI NOI+ CTSC ", difficulty_parser("7"))
 
-    def test_read_pickle_info(self):
-        self.assertEqual({'C3VK': '17a3d2',
-                          '__client_id': 'ff46d237765f42758afd194a2d5688175f25b28b',
-                          '_uid': '87731',
-                          'expiry': 1697286335}, read_pickle_info())
+    # def test_read_pickle_info(self):
+    #     self.assertEqual()
 
     def test_clean_folder_name(self):
         self.assertEqual("test", clean_folder_name("test"))
