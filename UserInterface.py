@@ -7,8 +7,9 @@ import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import selenium.common.exceptions
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.edge.service import Service as EdgeService
 
 import Utils
 from Log import LoggerHandler
@@ -57,41 +58,47 @@ def handle_login():
 
 def handle_login():
     def get_driver():
-        service = ChromeService(executable_path=r"./chromedriver.exe")
-        driver = webdriver.Chrome(service=service)
+        # service = ChromeService(executable_path=r"./chromedriver.exe")
 
+        edge_service = EdgeService(executable_path=r"./msedgedriver.exe")
+        # driver = webdriver.Chrome(service=service)
+        driver = webdriver.Edge(service=edge_service)
         return driver
 
     def get_cookie():
         browser = get_driver()
         browser.get("https://www.luogu.com.cn/auth/login")
         while True:
-            if browser.current_url == 'https://www.luogu.com.cn/':
-                luogu_cookies = browser.get_cookies()
-                browser.quit()
+            try:
+                if browser.current_url == 'https://www.luogu.com.cn/':
+                    luogu_cookies = browser.get_cookies()
+                    browser.quit()
 
-                cookies = {}
+                    cookies = {}
 
-                # 将获取到的cookie写入准备导出的cookies变量中
+                    # 将获取到的cookie写入准备导出的cookies变量中
 
-                for item in luogu_cookies:
-                    cookies[item['name']] = item['value']
+                    for item in luogu_cookies:
+                        cookies[item['name']] = item['value']
 
-                # 获得过期时间
-                cookies['expiry'] = min(luogu_cookies[1]['expiry'], luogu_cookies[2]['expiry'])
+                    # 获得过期时间
+                    cookies['expiry'] = min(luogu_cookies[1]['expiry'], luogu_cookies[2]['expiry'])
 
-                # 使用pickle库导出
-                output_path = open(r'luogucookie.pickle', 'wb')
-                pickle.dump(cookies, output_path)
-                output_path.close()
+                    # 使用pickle库导出
+                    output_path = open(r'luogucookie.pickle', 'wb')
+                    pickle.dump(cookies, output_path)
+                    output_path.close()
 
-                uid_var.set(str(cookies['_uid']))
-                client_id_display_var.set(str(cookies['__client_id']))
+                    uid_var.set(str(cookies['_uid']))
+                    client_id_display_var.set(str(cookies['__client_id']))
 
-                uid_display.update()
-                client_id_display.update()
+                    uid_display.update()
+                    client_id_display.update()
 
-                return cookies
+                    return cookies
+            except selenium.common.exceptions.NoSuchWindowException:
+                messagebox.showinfo("登录失败!", "浏览器窗口已关闭!")
+                break
 
     # 注意! 这是跑在其他线程上的!
     p = threading.Thread(target=get_cookie)
@@ -133,7 +140,7 @@ def start_crawling():
     def check_task_complete():
         while True:
             if work_queue.empty():
-                time.sleep(0.1)
+                time.sleep(6.5)
                 messagebox.showinfo("任务完成", "任务完成!")
                 Utils.run_jar()
                 break

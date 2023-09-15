@@ -2,12 +2,14 @@ import json
 import os
 import pickle
 import re
+import unittest
 from urllib.parse import unquote
 
 import Log
 
 diff_mapper = r"./mappers/difficulty.json"
 tag_mapper = r"./mappers/mapper.json"
+
 logger = Log.LoggerHandler()
 
 
@@ -29,7 +31,6 @@ def json_parser(decode_result):
 def difficulty_parser(tag_id):
     try:
         # 打开 JSON 文件并读取内容
-        # print(os.getcwd())
         with open(diff_mapper, 'r') as file:
             data = json.load(file)
 
@@ -86,3 +87,20 @@ def clean_folder_name(folder_name):
 def run_jar():
     cmd_run = "run_frontend.bat"
     os.system(cmd_run)
+
+
+class TestUtils(unittest.TestCase):
+    def test_difficulty_parser(self):
+
+        self.assertEqual("暂无评定 ", difficulty_parser("0"))
+        self.assertEqual("入门 ", difficulty_parser("1"))
+        self.assertEqual("\u666e\u53ca\u2212 ", difficulty_parser("2"))
+        self.assertEqual("\u666e\u53ca \u63d0\u9ad8- ", difficulty_parser("3"))
+        self.assertEqual("\u666e\u53ca+ \u63d0\u9ad8 ", difficulty_parser("4"))
+        self.assertEqual("\u63d0\u9ad8+ \u7701\u9009- ", difficulty_parser("5"))
+        self.assertEqual("\u7701\u9009 noi- ", difficulty_parser("6"))
+        self.assertEqual("NOI NOI+ CTSC ", difficulty_parser("7"))
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -15,12 +15,12 @@ class WebCrawlerWorker:
 
         self.cookie = cookie
         self.path = path
-        self.init_folder_configure()
+        self.__init_folder_configure()
         # 题解与练习的爬虫
         self.crawler_worker = WebCrawlerModules.CrawlerWorker(self.path, self.id, self.header, self.cookie,
                                                               progress_callback)
 
-    def init_folder_configure(self):
+    def __init_folder_configure(self):
         if not os.path.exists(self.path):
             # 如果文件夹不存在，使用os.mkdir创建它
             os.mkdir(self.path)

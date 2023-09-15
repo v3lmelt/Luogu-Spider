@@ -6,8 +6,8 @@ import html2text
 import requests
 from bs4 import BeautifulSoup
 
-import Utils
 from Log import LoggerHandler
+import Utils
 
 logger = LoggerHandler(name="CrawlerWorker")
 sync_lock = threading.Lock()
@@ -59,7 +59,7 @@ class CrawlerWorker:
     ========
     '''
 
-    def switch_crawl_progress(self, status, status_text=None):
+    def __switch_crawl_progress(self, status, status_text=None):
         if status == 1:
             self.status = 1
             self.status_text = "正在爬取题目!"
@@ -85,10 +85,10 @@ class CrawlerWorker:
     ========
     '''
 
-    def get_full_website_link(self):
+    def __get_full_website_link(self):
         return "https://www.luogu.com.cn/problem/P" + str(self.id)
 
-    def get_solution_website_link(self):
+    def __get_solution_website_link(self):
         return "https://www.luogu.com.cn/problem/solution/P" + str(self.id)
 
     '''
@@ -106,7 +106,7 @@ class CrawlerWorker:
     ========
     '''
 
-    def generate_file_path(self):
+    def __generate_file_path(self):
         taglist = ""
         if self.tags is not None:
             for p in self.tags:
@@ -118,13 +118,13 @@ class CrawlerWorker:
             os.makedirs(file_path)
         return file_path
 
-    def generate_exercise_filename(self):
-        exercise_path = self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
+    def __generate_exercise_filename(self):
+        exercise_path = self.__generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
         self.exercise_path = exercise_path
         return exercise_path
 
-    def generate_solution_filename(self):
-        solution_path = self.generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
+    def __generate_solution_filename(self):
+        solution_path = self.__generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
         self.solution_path = solution_path
         return solution_path
 
@@ -167,16 +167,16 @@ class CrawlerWorker:
 
     def get_exercise(self):
         try:
-            page = requests.get(self.get_full_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
+            page = requests.get(self.__get_full_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
         except requests.exceptions.RequestException:
-            self.switch_crawl_progress(-1, "获取练习页面信息异常! 可能超时.")
+            self.__switch_crawl_progress(-1, "获取练习页面信息异常! 可能超时.")
             return -1
         else:
             #   判断网页是否成功获取
             if page.status_code == 200:
                 # 煲汤喝一下
                 soup = BeautifulSoup(page.content, 'lxml')
-                self.switch_crawl_progress(1)
+                self.__switch_crawl_progress(1)
                 # 获取题目的分类信息
                 decoded_json = Utils.uri_component_decoder(soup)
                 data = Utils.json_parser(decoded_json)
@@ -191,30 +191,30 @@ class CrawlerWorker:
                     self.difficulty = data['currentData']['problem']['difficulty']
                     self.title = Utils.clean_folder_name(soup.article.h1.get_text())
                 except KeyError:
-                    self.switch_crawl_progress(-2, "异常, 你无权查看此题目")
+                    self.__switch_crawl_progress(-2, "异常, 你无权查看此题目")
                     return -1
                 else:
                     html2text_converter = html2text.HTML2Text()
                     # 将HTML转换为Markdown
                     markdown_content = html2text_converter.handle(str(soup.article))
                     # 将Markdown文件保存至文件夹中
-                    with open(self.generate_exercise_filename(), 'w', encoding='utf-8') as file:
+                    with open(self.__generate_exercise_filename(), 'w', encoding='utf-8') as file:
                         file.write(markdown_content)
-                        self.switch_crawl_progress(2)
+                        self.__switch_crawl_progress(2)
 
             else:
-                self.switch_crawl_progress(-3, f"访问题目页面出错, 代码: {page.status_code}")
+                self.__switch_crawl_progress(-3, f"访问题目页面出错, 代码: {page.status_code}")
                 return -1
 
     def get_solution(self):
         try:
-            page = requests.get(self.get_solution_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
+            page = requests.get(self.__get_solution_website_link(), headers=self.header, cookies=self.cookie, timeout=5)
         except requests.exceptions.RequestException:
-            self.switch_crawl_progress(-1, "获取题解页面信息异常! 可能超时.")
+            self.__switch_crawl_progress(-1, "获取题解页面信息异常! 可能超时.")
         else:
             #   判断网页是否成功获取
             if page.status_code == 200:
-                self.switch_crawl_progress(3)
+                self.__switch_crawl_progress(3)
                 soup = BeautifulSoup(page.content, 'lxml')
                 decode_res = (Utils.uri_component_decoder(soup))
                 data = Utils.json_parser(decode_res)
@@ -223,16 +223,16 @@ class CrawlerWorker:
                     first_result_content = data['currentData']['solutions']['result'][0]['content']
                     self.solution_author = data['currentData']['solutions']['result'][0]['author']['name']
                 except IndexError:
-                    self.switch_crawl_progress(-4, "异常, 题解不存在.")
+                    self.__switch_crawl_progress(-4, "异常, 题解不存在.")
                 except KeyError:
-                    self.switch_crawl_progress(-4, "异常, 题解不存在.")
+                    self.__switch_crawl_progress(-4, "异常, 题解不存在.")
                 else:
-                    with open(self.generate_solution_filename(), 'w', encoding='utf-8') as file:
+                    with open(self.__generate_solution_filename(), 'w', encoding='utf-8') as file:
                         file.write(first_result_content)
-                        self.switch_crawl_progress(4)
+                        self.__switch_crawl_progress(4)
             else:
-                self.switch_crawl_progress(-3, f"访问题解页面出错, 代码: {page.status_code}")
-        self.insert_obj_to_database()
+                self.__switch_crawl_progress(-3, f"访问题解页面出错, 代码: {page.status_code}")
+        self.__insert_obj_to_database()
 
     '''
     ========
@@ -244,7 +244,8 @@ class CrawlerWorker:
             由于题目需求, 本程序选用的是SQLite, 较为轻便.
     ========
     '''
-    def insert_obj_to_database(self):
+
+    def __insert_obj_to_database(self):
         # 查询自身状态, -1, -2, -3的错误码是不被允许加入数据库的，因为题目信息缺失
         if self.status != -1 and self.status != -2 and self.status != -3:
             # 翻译难度信息和tag信息
