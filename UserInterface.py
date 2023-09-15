@@ -6,7 +6,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-
+from QueryModule import QueryLuoguList
 import selenium.common.exceptions
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service as EdgeService
@@ -19,6 +19,7 @@ complete_message_box_show = False
 is_server_run = False
 logger = LoggerHandler(name="UserInterface")
 
+query_result = []
 '''
 ========
 UI部分
@@ -39,6 +40,14 @@ def select_path():
 def set_entry_content(entry, content):
     entry.delete(0, 'end')
     entry.insert(0, content)
+
+
+def clear_library():
+    library_var.set('')
+
+
+def clear_difficulty():
+    difficulty_var.set('')
 
 
 def callback(exercise_id, status, status_text):
@@ -129,6 +138,40 @@ def check_cookie_info_valid():
 '''
 
 
+def start_query():
+    def query_func():
+        if check_cookie_info_valid() or (client_id_display.get() != "" and uid_display.get() != ""):
+            # 先获取难度信息, 并转换成对应的ID
+            try:
+                difficulty_id = Utils.difficulty_to_id_parser(difficulty_var.get())
+                # 获取tag信息, 并转换成对应的ID
+                tag_str = tag_entry.get()
+                tag_id_for_query = ""
+                tag_id = []
+                if tag_str != '':
+                    tag_arr = tag_str.split(',')
+                    for item in tag_arr:
+                            tag_id.append(Utils.tag_to_id_parser(item))
+                            tag_id_for_query = "|".join(tag_id)
+            except ValueError:
+                messagebox.showinfo("Tag错误!, 你输入了一个不正确的Tag")
+            else:
+                # 获取题库信息, 并转换成对应的ID
+                library_var_id = Utils.library_type_parser(library_var.get())
+                keyword_for_query = keyword_entry.get()
+
+                query_obj = QueryLuoguList(keyword_for_query, difficulty_id, tag_id_for_query, library_var_id)
+                query_obj.search_with_params()
+
+                global query_result
+                query_result = query_obj.get_result_id()
+                query_tree.delete(*query_tree.get_children())
+                for x, y in zip(query_obj.get_result_id(), query_obj.get_result_name()):
+                    query_tree.insert('', "end", x, values=(x, y))
+                    query_tree.yview_moveto(1.0)
+    p = threading.Thread(target=query_func)
+    p.start()
+
 def start_crawling():
     def multithreaded():
         while not work_queue.empty():
@@ -153,15 +196,10 @@ def start_crawling():
     # 初始化登录信息，要么有保存在本地的cookie内容，要么用户输入了cookie内容
     if check_cookie_info_valid() or (uid_display.get() != "" and client_id_display.get() != ""):
         # 检查用户输入信息是否合法
-        if (exercise_id_entry.get().isdecimal() and exercise_id_end_entry.get().isdecimal() and thread_num_entry.get().
+        if (thread_num_entry.get().
                 isdecimal() and path_entry.get() != ""):
             # 初始化队列信息
             work_queue = queue.Queue()
-
-            # 初始化工作信息
-            start_id = int(exercise_id_entry.get())
-            end_id = int(exercise_id_end_entry.get())
-
             thread_num = int(thread_num_entry.get())
             save_path = path_entry.get()
 
@@ -177,18 +215,10 @@ def start_crawling():
             else:
                 # 用户自定义输入
                 actual_cookie = {'_uid': str(uid_display.get()), '__client_id': str(client_id_display.get())}
-            try:
-                if start_id > end_id or start_id < 0 or end_id < 0 or start_id < 1000:
-                    raise ValueError("ID错误!")
-                if thread_num > end_id - start_id:
-                    thread_num = end_id - start_id
-                    set_entry_content(thread_num_entry, str(thread_num))
-            except ValueError:
-                messagebox.showinfo("ID错误", "ID错误!")
-                return
-            else:
-                # 将任务放入队列
-                for i in range(start_id, end_id + 1):
+            # 将任务放入队列
+            global query_result
+            if query_result:
+                for i in query_result:
                     work_queue.put(i)
                 # 从queue中拿取一个任务，分配给指定数量的线程
                 for x in range(thread_num):
@@ -201,6 +231,8 @@ def start_crawling():
                 # 检测任务是否完成线程
                 p = threading.Thread(target=check_task_complete)
                 p.start()
+            else:
+                messagebox.showinfo("你还没有搜索!", "你还没有搜索, 没有办法爬取!")
         else:
             messagebox.showinfo("输入错误", "你输入的信息有误!")
     else:
@@ -219,19 +251,43 @@ def start_crawling():
 root = tk.Tk()
 root.title("Web爬虫GUI")
 
-# 创建起始题目ID标签和输入框
-exercise_id_label = tk.Label(root, text="起始题目ID")
-exercise_id_label.grid(row=0, column=0, padx=(10, 5), pady=5)
+# 创建所属题库标签和下拉菜单
+library_label = tk.Label(root, text="所属题库")
+library_label.grid(row=7, column=0, padx=(10, 5), pady=5)
 
-exercise_id_entry = tk.Entry(root)
-exercise_id_entry.grid(row=0, column=1, padx=(5, 10), pady=5)
+library_var = tk.StringVar()
+library_optionmenu = tk.OptionMenu(root, library_var, "主题库", "入门与面试", "CodeForces", "SPOJ", "AtCoder",
+                                   "UVA")
+library_optionmenu.grid(row=7, column=1, padx=(5, 10), pady=5)
 
-# 创建起始题目ID标签和输入框
-exercise_id_end_label = tk.Label(root, text="结束题目ID")
-exercise_id_end_label.grid(row=0, column=2, padx=(10, 5), pady=5)
+clear_library = tk.Button(root, text="清空题库", command=clear_library)
+clear_library.grid(row=7, column=2, padx=(10, 5), pady=5)
 
-exercise_id_end_entry = tk.Entry(root)
-exercise_id_end_entry.grid(row=0, column=3, padx=(5, 10), pady=5)
+# 创建难度标签和下拉菜单
+difficulty_label = tk.Label(root, text="难度")
+difficulty_label.grid(row=10, column=0, padx=(10, 5), pady=5)
+
+difficulty_var = tk.StringVar()
+difficulty_optionmenu = tk.OptionMenu(root, difficulty_var, "暂无评定 ", "入门 ", "普及- ", "普及 提高- ",
+                                      "普及+ 提高 ", "提高+ 省选- ", "省选 NOI- ", "NOI NOI+ CTSC ")
+difficulty_optionmenu.grid(row=10, column=1, padx=(5, 10), pady=5)
+
+clear_difficulty = tk.Button(root, text="清空难度", command=clear_difficulty)
+clear_difficulty.grid(row=10, column=2, padx=(10, 5), pady=5)
+
+# 创建标签标签和输入框
+tag_label = tk.Label(root, text="标签")
+tag_label.grid(row=11, column=0, padx=(10, 5), pady=5)
+
+tag_entry = tk.Entry(root)
+tag_entry.grid(row=11, column=1, padx=(5, 10), pady=5)
+
+# 创建关键词标签和输入框
+keyword_label = tk.Label(root, text="关键词")
+keyword_label.grid(row=12, column=0, padx=(10, 5), pady=5)
+
+keyword_entry = tk.Entry(root)
+keyword_entry.grid(row=12, column=1, padx=(5, 10), pady=5)
 
 # 创建线程数标签和输入框
 thread_num_label = tk.Label(root, text="线程数")
@@ -268,10 +324,9 @@ start_button.grid(row=6, column=0, columnspan=2, padx=10, pady=5)
 login_button = tk.Button(root, text="登录", command=handle_login)
 login_button.grid(row=6, column=1, columnspan=2, padx=10, pady=5)
 
-# # 打开管理界面按钮
-# manager_ui_button = tk.Button(root, text="打开前端界面", command=open_frontend)
-# manager_ui_button.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
-
+# 创建查询按钮
+login_button = tk.Button(root, text="查询", command=start_query)
+login_button.grid(row=6, column=2, columnspan=2, padx=10, pady=5)
 # 创建垂直滚动条
 vsb = ttk.Scrollbar(root, orient="vertical")
 
@@ -279,7 +334,13 @@ vsb = ttk.Scrollbar(root, orient="vertical")
 tree = ttk.Treeview(root, columns=("题目ID", "爬取状态"), show="headings", yscrollcommand=vsb.set)
 tree.heading("题目ID", text="题目ID")
 tree.heading("爬取状态", text="爬取状态")
-tree.grid(row=8, column=0, columnspan=10, padx=10, pady=5)
+tree.grid(row=8, column=0, columnspan=5, padx=10, pady=5)
+
+# 创建查询列表框
+query_tree = ttk.Treeview(root, columns=("题目ID", "题目名称"), show="headings")
+query_tree.heading("题目ID", text="题目ID")
+query_tree.heading("题目名称", text="题目名称")
+query_tree.grid(row=8, column=5, columnspan=10, padx=10, pady=5)
 
 # 配置滚动条
 vsb.config(command=tree.yview)

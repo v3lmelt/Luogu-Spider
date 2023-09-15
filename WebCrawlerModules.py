@@ -87,10 +87,10 @@ class CrawlerWorker:
     '''
 
     def __get_full_website_link(self):
-        return "https://www.luogu.com.cn/problem/P" + str(self.id)
+        return "https://www.luogu.com.cn/problem/" + str(self.id)
 
     def __get_solution_website_link(self):
-        return "https://www.luogu.com.cn/problem/solution/P" + str(self.id)
+        return "https://www.luogu.com.cn/problem/solution/" + str(self.id)
 
     '''
     ========
@@ -113,19 +113,19 @@ class CrawlerWorker:
             for p in self.tags:
                 taglist += "-" + Utils.tag_parser(str(p))
         file_path = (self.path + "/" +
-                     Utils.difficulty_parser(str(self.difficulty)) + taglist + "/P" + str(self.id) + "-" + str(
+                     Utils.difficulty_parser(str(self.difficulty)) + taglist + "/" + str(self.id) + "-" + str(
                     self.title) + "/")
         if not os.path.exists(file_path):
             os.makedirs(file_path)
         return file_path
 
     def __generate_exercise_filename(self):
-        exercise_path = self.__generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + ".md"
+        exercise_path = self.__generate_file_path() + str(self.id) + "-" + str(self.title) + ".md"
         self.exercise_path = exercise_path
         return exercise_path
 
     def __generate_solution_filename(self):
-        solution_path = self.__generate_file_path() + "P" + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
+        solution_path = self.__generate_file_path() + str(self.id) + "-" + str(self.title) + "-" + "题解" + ".md"
         self.solution_path = solution_path
         return solution_path
 
@@ -287,7 +287,7 @@ class CrawlerWorker:
                 # 如果表不存在，则创建exercise表
                 cursor.execute('''
                 CREATE TABLE exercise (
-                    exercise_id INTEGER PRIMARY KEY,
+                    exercise_id TEXT PRIMARY KEY,
                     tags TEXT,
                     difficulty TEXT,
                     title TEXT,
@@ -322,8 +322,7 @@ class TestWorkers(unittest.TestCase):
     def test_get_exercise(self):
         worker = CrawlerWorker(path=r"./test", id=1000, header={
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                          'Chrome/70.0.3538.102 Safari/537.36'}, cookie={'__client_id': '795557347cf6273bbd5cb2f28e9fb8'
-                                                                                        'b0a560e57a', '_uid': '87731'})
+                          'Chrome/70.0.3538.102 Safari/537.36'}, cookie={})
         worker.get_exercise()
         self.assertEqual(worker.status, 2)
         worker.get_solution()

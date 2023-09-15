@@ -44,6 +44,47 @@ def difficulty_parser(tag_id):
         return ""  # 如果文件不存在，返回 None 或其他适当的值
 
 
+def difficulty_to_id_parser(difficulty):
+    try:
+        # 打开 JSON 文件并读取内容
+        with open(diff_mapper, 'r') as file:
+            data = json.load(file)
+            for (k, v) in data['tags'].items():
+                if v == difficulty:
+                    return k
+    except FileNotFoundError:
+        return ""
+
+
+def library_type_parser(type):
+    if type == "主题库":
+        return "P"
+    if type == "入门与面试":
+        return "B"
+    if type == "CodeForces":
+        return "CF"
+    if type == "SPOJ":
+        return "SP"
+    if type == "AtCoder":
+        return "AT"
+    if type == "UVA":
+        return "UVA"
+
+
+def tag_to_id_parser(tag):
+    try:
+        # 打开 JSON 文件并读取内容
+        with open(tag_mapper, 'r') as file:
+            data = json.load(file)
+            for (k, v) in data['tags'].items():
+                if v == tag:
+                    return k
+    except FileNotFoundError:
+        return ""
+    else:
+        raise ValueError("Illegal Tag")
+
+
 def tag_parser(tag_id):
     try:
         # 打开 JSON 文件并读取内容
@@ -111,3 +152,9 @@ class TestUtils(unittest.TestCase):
     def test_clean_folder_name(self):
         self.assertEqual("test", clean_folder_name("test"))
         self.assertEqual("abcedf", clean_folder_name("*****abcedf"))
+
+    def test_rev_diff_tag(self):
+        self.assertEqual("0", difficulty_to_id_parser("暂无评定 "))
+
+    def test_rev_tag(self):
+        self.assertEqual("312", tag_to_id_parser("Shannon 开关游戏"))
