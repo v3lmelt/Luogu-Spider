@@ -16,7 +16,7 @@ from Log import LoggerHandler
 from WebCrawlerWorker import WebCrawlerWorker
 
 complete_message_box_show = False
-
+is_server_run = False
 logger = LoggerHandler(name="UserInterface")
 
 '''
@@ -34,6 +34,11 @@ def select_path():
     path = filedialog.askdirectory()
     path_entry.delete(0, tk.END)
     path_entry.insert(0, path)
+
+
+def set_entry_content(entry, content):
+    entry.delete(0, 'end')
+    entry.insert(0, content)
 
 
 def callback(exercise_id, status, status_text):
@@ -58,10 +63,7 @@ def handle_login():
 
 def handle_login():
     def get_driver():
-        # service = ChromeService(executable_path=r"./chromedriver.exe")
-
         edge_service = EdgeService(executable_path=r"./msedgedriver.exe")
-        # driver = webdriver.Chrome(service=service)
         driver = webdriver.Edge(service=edge_service)
         return driver
 
@@ -89,8 +91,8 @@ def handle_login():
                     pickle.dump(cookies, output_path)
                     output_path.close()
 
-                    uid_var.set(str(cookies['_uid']))
-                    client_id_display_var.set(str(cookies['__client_id']))
+                    set_entry_content(uid_display, str(cookies['_uid']))
+                    set_entry_content(client_id_display, str(cookies['__client_id']))
 
                     uid_display.update()
                     client_id_display.update()
@@ -138,50 +140,67 @@ def start_crawling():
             time.sleep(random.uniform(0.3, 1))
 
     def check_task_complete():
+        global is_server_run
         while True:
             if work_queue.empty():
-                time.sleep(6.5)
+                time.sleep(2)
                 messagebox.showinfo("任务完成", "任务完成!")
-                Utils.run_jar()
+                if not is_server_run:
+                    is_server_run = True
+                    Utils.run_jar(root)
                 break
 
-    # 初始化登录信息
-    if check_cookie_info_valid():
-        # 初始化队列信息
-        work_queue = queue.Queue()
+    # 初始化登录信息，要么有保存在本地的cookie内容，要么用户输入了cookie内容
+    if check_cookie_info_valid() or (uid_display.get() != "" and client_id_display.get() != ""):
+        # 检查用户输入信息是否合法
+        if (exercise_id_entry.get().isdecimal() and exercise_id_end_entry.get().isdecimal() and thread_num_entry.get().
+                isdecimal() and path_entry.get() != ""):
+            # 初始化队列信息
+            work_queue = queue.Queue()
 
-        # 初始化工作信息
-        start_id = int(exercise_id_entry.get())
-        exercise_num = int(num_of_exercises_entry.get())
-        thread_num = int(thread_num_entry.get())
-        save_path = path_entry.get()
+            # 初始化工作信息
+            start_id = int(exercise_id_entry.get())
+            end_id = int(exercise_id_end_entry.get())
 
-        # 从pickle文件中读取信息
-        cookie_data = Utils.read_pickle_info()
+            thread_num = int(thread_num_entry.get())
+            save_path = path_entry.get()
 
-        uid_var.set(str(cookie_data['_uid']))
-        client_id_display_var.set(str(cookie_data['__client_id']))
+            actual_cookie = {}
+            if check_cookie_info_valid():
+                # 从pickle文件中读取信息
+                cookie_data = Utils.read_pickle_info()
 
-        uid_display.update()
-        client_id_display.update()
-        # 生成传给Worker的参数
-        actual_cookie = {'_uid': str(cookie_data['_uid']), '__client_id': str(cookie_data['__client_id'])}
+                set_entry_content(uid_display, str(cookie_data['_uid']))
+                set_entry_content(client_id_display, str(cookie_data['__client_id']))
+                # 生成传给Worker的参数
+                actual_cookie = {'_uid': str(cookie_data['_uid']), '__client_id': str(cookie_data['__client_id'])}
+            else:
+                # 用户自定义输入
+                actual_cookie = {'_uid': str(uid_display.get()), '__client_id': str(client_id_display.get())}
+            try:
+                if start_id > end_id or start_id < 0 or end_id < 0 or start_id < 1000:
+                    raise ValueError("ID错误!")
+                if thread_num > end_id - start_id:
+                    thread_num = end_id - start_id
+                    set_entry_content(thread_num_entry, str(thread_num))
+            except ValueError:
+                messagebox.showinfo("ID错误", "ID错误!")
+                return
+            else:
+                # 将任务放入队列
+                for i in range(start_id, end_id + 1):
+                    work_queue.put(i)
+                # 从queue中拿取一个任务，分配给指定数量的线程
+                for x in range(thread_num):
+                    if not work_queue.empty():
+                        t = threading.Thread(target=multithreaded)
+                        t.start()
 
-        # start_ID - exercise_num 不能是负值
-        if start_id - exercise_num < 1:
-            raise ValueError("start_ID - exercise_num < 1 !")
-        for i in range(start_id - exercise_num + 1, start_id + 1):
-            work_queue.put(i)
-
-        # 从queue中拿取一个任务，分配给指定数量的线程
-        for x in range(thread_num):
-            if not work_queue.empty():
-                t = threading.Thread(target=multithreaded)
-                t.start()
-
-        # 检测任务是否完成线程
-        p = threading.Thread(target=check_task_complete)
-        p.start()
+                # 检测任务是否完成线程
+                p = threading.Thread(target=check_task_complete)
+                p.start()
+        else:
+            messagebox.showinfo("输入错误", "你输入的信息有误!")
     else:
         messagebox.showinfo("Cookie信息", "检测不到你的Cookie信息或已失效, 请重新登录!")
         p = threading.Thread(target=handle_login)
@@ -205,12 +224,12 @@ exercise_id_label.grid(row=0, column=0, padx=(10, 5), pady=5)
 exercise_id_entry = tk.Entry(root)
 exercise_id_entry.grid(row=0, column=1, padx=(5, 10), pady=5)
 
-# 创建要爬取的题目数量标签和输入框
-num_of_exercises_label = tk.Label(root, text="要爬取的题目数量")
-num_of_exercises_label.grid(row=1, column=0, padx=(10, 5), pady=5)
+# 创建起始题目ID标签和输入框
+exercise_id_end_label = tk.Label(root, text="结束题目ID")
+exercise_id_end_label.grid(row=0, column=2, padx=(10, 5), pady=5)
 
-num_of_exercises_entry = tk.Entry(root)
-num_of_exercises_entry.grid(row=1, column=1, padx=(5, 10), pady=5)
+exercise_id_end_entry = tk.Entry(root)
+exercise_id_end_entry.grid(row=0, column=3, padx=(5, 10), pady=5)
 
 # 创建线程数标签和输入框
 thread_num_label = tk.Label(root, text="线程数")
@@ -230,16 +249,14 @@ path_entry.grid(row=3, column=1, padx=(5, 10), pady=5)
 client_id_label = tk.Label(root, text="__client_id")
 client_id_label.grid(row=4, column=0, padx=(10, 5), pady=5)
 
-client_id_display_var = tk.StringVar()
-client_id_display = tk.Label(root, textvariable=client_id_display_var)
+client_id_display = tk.Entry(root)
 client_id_display.grid(row=4, column=1, padx=(5, 10), pady=5)
 
 # 创建_uid标签和输入框
 uid_label = tk.Label(root, text="_uid")
 uid_label.grid(row=5, column=0, padx=(10, 5), pady=5)
 
-uid_var = tk.StringVar()
-uid_display = tk.Label(root, textvariable=uid_var)
+uid_display = tk.Entry(root)
 uid_display.grid(row=5, column=1, padx=(5, 10), pady=5)
 # 创建开始按钮
 start_button = tk.Button(root, text="开始爬取", command=start_crawling)
@@ -247,7 +264,11 @@ start_button.grid(row=6, column=0, columnspan=2, padx=10, pady=5)
 
 # 创建登录按钮
 login_button = tk.Button(root, text="登录", command=handle_login)
-login_button.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
+login_button.grid(row=6, column=1, columnspan=2, padx=10, pady=5)
+
+# # 打开管理界面按钮
+# manager_ui_button = tk.Button(root, text="打开前端界面", command=open_frontend)
+# manager_ui_button.grid(row=7, column=0, columnspan=2, padx=10, pady=5)
 
 # 创建垂直滚动条
 vsb = ttk.Scrollbar(root, orient="vertical")
@@ -256,7 +277,7 @@ vsb = ttk.Scrollbar(root, orient="vertical")
 tree = ttk.Treeview(root, columns=("题目ID", "爬取状态"), show="headings", yscrollcommand=vsb.set)
 tree.heading("题目ID", text="题目ID")
 tree.heading("爬取状态", text="爬取状态")
-tree.grid(row=8, column=0, columnspan=2, padx=10, pady=5)
+tree.grid(row=8, column=0, columnspan=10, padx=10, pady=5)
 
 # 配置滚动条
 vsb.config(command=tree.yview)
@@ -266,10 +287,10 @@ if __name__ == '__main__':
         # 从pickle文件中读取信息
         cookie_data = Utils.read_pickle_info()
 
-        uid_var.set(str(cookie_data['_uid']))
-        client_id_display_var.set(str(cookie_data['__client_id']))
+        set_entry_content(uid_display, str(cookie_data['_uid']))
+        set_entry_content(client_id_display, str(cookie_data['__client_id']))
 
         uid_display.update()
         client_id_display.update()
-
+    # root.protocol("WM_DELETE_WINDOW", on_exit)
     root.mainloop()

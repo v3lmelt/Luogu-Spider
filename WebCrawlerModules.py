@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import threading
+import unittest
 
 import html2text
 import requests
@@ -180,7 +181,7 @@ class CrawlerWorker:
                 # 获取题目的分类信息
                 decoded_json = Utils.uri_component_decoder(soup)
                 data = Utils.json_parser(decoded_json)
-                logger.info(data)
+                logger.debug(data)
                 try:
                     # 获取练习作者，标签，难度，标题等信息
                     self.exercise_author = data['currentData']['problem']['provider']['name']
@@ -195,13 +196,14 @@ class CrawlerWorker:
                     return -1
                 else:
                     html2text_converter = html2text.HTML2Text()
+                    content_soup = BeautifulSoup(str(soup.article), 'lxml')
                     # 将HTML转换为Markdown
-                    markdown_content = html2text_converter.handle(str(soup.article))
+                    markdown_content = html2text_converter.handle(str(content_soup.prettify()))
                     # 将Markdown文件保存至文件夹中
                     with open(self.__generate_exercise_filename(), 'w', encoding='utf-8') as file:
                         file.write(markdown_content)
                         self.__switch_crawl_progress(2)
-
+                        return 1
             else:
                 self.__switch_crawl_progress(-3, f"访问题目页面出错, 代码: {page.status_code}")
                 return -1
@@ -218,14 +220,14 @@ class CrawlerWorker:
                 soup = BeautifulSoup(page.content, 'lxml')
                 decode_res = (Utils.uri_component_decoder(soup))
                 data = Utils.json_parser(decode_res)
-                logger.info(data)
+                logger.debug(data)
                 try:
                     first_result_content = data['currentData']['solutions']['result'][0]['content']
                     self.solution_author = data['currentData']['solutions']['result'][0]['author']['name']
                 except IndexError:
-                    self.__switch_crawl_progress(-4, "异常, 题解不存在.")
+                    self.__switch_crawl_progress(-4, "异常, 题解不存在, 或未登录 & 登录信息错误.")
                 except KeyError:
-                    self.__switch_crawl_progress(-4, "异常, 题解不存在.")
+                    self.__switch_crawl_progress(-4, "异常, 题解不存在, 或未登录 & 登录信息错误.")
                 else:
                     with open(self.__generate_solution_filename(), 'w', encoding='utf-8') as file:
                         file.write(first_result_content)
@@ -310,7 +312,19 @@ class CrawlerWorker:
                         VALUES (:exercise_id, :tags, :difficulty, :title, :exercise_path, :solution_path, :solution_author, :exercise_author)
                     ''', exercise_data)
                     conn.commit()
-                    logger.info(f"exercise_id {self.id} 已插入")
+                    logger.info(f"ID {self.id} 已成功插入数据库!")
                 else:
-                    logger.info(f"exercise_id {self.id} 已存在，无需插入")
+                    logger.info(f"ID {self.id} 已存在，无需插入")
             sync_lock.release()
+
+
+class TestWorkers(unittest.TestCase):
+    def test_get_exercise(self):
+        worker = CrawlerWorker(path=r"./test", id=1000, header={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/70.0.3538.102 Safari/537.36'}, cookie={'__client_id': '795557347cf6273bbd5cb2f28e9fb8'
+                                                                                        'b0a560e57a', '_uid': '87731'})
+        worker.get_exercise()
+        self.assertEqual(worker.status, 2)
+        worker.get_solution()
+        self.assertEqual(worker.status, 4)

@@ -2,6 +2,7 @@ import json
 import os
 import pickle
 import re
+import subprocess
 import unittest
 from urllib.parse import unquote
 
@@ -84,14 +85,14 @@ def clean_folder_name(folder_name):
     return clean_string
 
 
-def run_jar():
+def run_jar(root):
     cmd_run = "run_frontend.bat"
     os.system(cmd_run)
+    # root.server_proc = subprocess.Popen(['java', '-jar', 'frontend.jar'])
 
 
 class TestUtils(unittest.TestCase):
     def test_difficulty_parser(self):
-
         self.assertEqual("暂无评定 ", difficulty_parser("0"))
         self.assertEqual("入门 ", difficulty_parser("1"))
         self.assertEqual("\u666e\u53ca\u2212 ", difficulty_parser("2"))
@@ -101,6 +102,12 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("\u7701\u9009 noi- ", difficulty_parser("6"))
         self.assertEqual("NOI NOI+ CTSC ", difficulty_parser("7"))
 
+    def test_read_pickle_info(self):
+        self.assertEqual({'C3VK': '17a3d2',
+                          '__client_id': 'ff46d237765f42758afd194a2d5688175f25b28b',
+                          '_uid': '87731',
+                          'expiry': 1697286335}, read_pickle_info())
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_clean_folder_name(self):
+        self.assertEqual("test", clean_folder_name("test"))
+        self.assertEqual("abcedf", clean_folder_name("*****abcedf"))
