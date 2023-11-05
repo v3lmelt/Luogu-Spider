@@ -317,7 +317,6 @@ class CrawlerWorker:
                     logger.info(f"ID {self.id} 已存在，无需插入")
             sync_lock.release()
 
-
 class TestWorkers(unittest.TestCase):
     def test_get_exercise(self):
         worker = CrawlerWorker(path=r"./test", id=1000, header={
