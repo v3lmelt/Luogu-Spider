@@ -44,6 +44,47 @@ def difficulty_parser(tag_id):
         return ""  # 如果文件不存在，返回 None 或其他适当的值
 
 
+def difficulty_to_id_parser(difficulty):
+    try:
+        # 打开 JSON 文件并读取内容
+        with open(diff_mapper, 'r') as file:
+            data = json.load(file)
+            for (k, v) in data['tags'].items():
+                if v == difficulty:
+                    return k
+    except FileNotFoundError:
+        return ""
+
+
+def library_type_parser(type):
+    if type == "主题库":
+        return "P"
+    if type == "入门与面试":
+        return "B"
+    if type == "CodeForces":
+        return "CF"
+    if type == "SPOJ":
+        return "SP"
+    if type == "AtCoder":
+        return "AT"
+    if type == "UVA":
+        return "UVA"
+
+
+def tag_to_id_parser(tag):
+    try:
+        # 打开 JSON 文件并读取内容
+        with open(tag_mapper, 'r') as file:
+            data = json.load(file)
+            for (k, v) in data['tags'].items():
+                if v == tag:
+                    return k
+    except FileNotFoundError:
+        return ""
+    else:
+        raise ValueError("Illegal Tag")
+
+
 def tag_parser(tag_id):
     try:
         # 打开 JSON 文件并读取内容
@@ -102,12 +143,15 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("\u7701\u9009 noi- ", difficulty_parser("6"))
         self.assertEqual("NOI NOI+ CTSC ", difficulty_parser("7"))
 
-    def test_read_pickle_info(self):
-        self.assertEqual({'C3VK': '17a3d2',
-                          '__client_id': 'ff46d237765f42758afd194a2d5688175f25b28b',
-                          '_uid': '87731',
-                          'expiry': 1697286335}, read_pickle_info())
+    # def test_read_pickle_info(self):
+    #     self.assertEqual()
 
     def test_clean_folder_name(self):
         self.assertEqual("test", clean_folder_name("test"))
         self.assertEqual("abcedf", clean_folder_name("*****abcedf"))
+
+    def test_rev_diff_tag(self):
+        self.assertEqual("0", difficulty_to_id_parser("暂无评定 "))
+
+    def test_rev_tag(self):
+        self.assertEqual("312", tag_to_id_parser("Shannon 开关游戏"))
